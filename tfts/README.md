@@ -14,19 +14,27 @@ have been split into dedicated repositories:
 
 | What | Was | Is now |
 | --- | --- | --- |
-| Device firmware | `hemoglobulab_device`, branch `master` (`device-fw/`) | [bloodtwin_device_fw](https://github.com/greenlsi/bloodtwin_device_fw) |
+| Device firmware (current) | did not exist yet | [bloodtwin_device_fw](https://github.com/greenlsi/bloodtwin_device_fw), Zephyr / nRF Connect SDK |
+| Device firmware v1 (nRF5 SDK) | `hemoglobulab_device`, branch `master` (`device-fw/`) | [bloodtwin_device_fw](https://github.com/greenlsi/bloodtwin_device_fw), branch `legacy/nrf5-sdk-firmware` |
 | Signal processing and ML models | `hemoglobulab_device`, branch `devel_modeling` | [bloodtwin_device_models](https://github.com/greenlsi/bloodtwin_device_models) |
 | Board design, Gerbers and BOM | never in git, only in Drive | [bloodtwin_device_hw](https://github.com/greenlsi/bloodtwin_device_hw) |
-| Android app | `hemoglobulab_app` (its own repository) | **archived only**, superseded by [bloodtwin_webapp_frontend](https://github.com/greenlsi/bloodtwin_webapp_frontend) and [bloodtwin_webapp_backend](https://github.com/greenlsi/bloodtwin_webapp_backend) |
+| Android app | `hemoglobulab_app` (its own repository) | **archived**, superseded by [bloodtwin_webapp_frontend](https://github.com/greenlsi/bloodtwin_webapp_frontend) and [bloodtwin_webapp_backend](https://github.com/greenlsi/bloodtwin_webapp_backend) |
 | Android BLE reference library | `hemoglobulab_device`, branch `devel` (`android-app/`) | **archived only**, it is only a vendored copy of the Nordic example |
 
 Nothing was deleted. The archived repository keeps its full history, and each branch is
 also reachable through a tag: `archive/device-firmware`, `archive/data-modeling` and
 `archive/android-ble-reference`.
 
+The v1 firmware was moved with its own history preserved: the 20 commits that only touch
+`device-fw/` were extracted and pushed to `bloodtwin_device_fw` as the branch
+`legacy/nrf5-sdk-firmware`, tagged `archive/andres-moreno-nrf5-sdk`. It targets the
+nRF52840 DK with the old nRF5 SDK and Eclipse/GCC toolchain, and is superseded by the
+current Zephyr firmware on `main`.
+
 The Android app is intentionally **not** carried over into the new structure. It is
 superseded by the web application and is kept purely as a historical record, in its own
-[hemoglobulab_app](https://github.com/greenlsi/hemoglobulab_app) repository.
+archived [hemoglobulab_app](https://github.com/greenlsi/hemoglobulab_app) repository,
+tagged `archive/android-app-tfg-amoreno`.
 
 Note on the modelling code: the 2023 exploration in `devel_modeling` was left unfinished.
 The version of the code that actually produced the published results is the one now in
