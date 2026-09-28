@@ -31,19 +31,22 @@ Existe también `PERSONNEL_COSTS`, con el coste por persona y tipo de módulo (A
 
 **Matices importantes que hay que decirle a la alumna desde el principio:**
 
-- Los datos son **de 2018** y no se han revisado desde entonces.
+- Los datos son **de 2018** y el centro confirma que **siguen siendo válidos**.
 - Hoy se usan **solo para calcular coste**, como cálculo posterior. No son una variable de
   decisión ni asignan personas concretas.
 - Si una colecta no tiene `FORECAST`, el código lo estima como `DONACIONES / 0.85`. Hay un
   `TODO` explícito en el código reconociendo que la columna de previsión está incompleta y
-  se rellenó a mano.
+  se rellenó a mano. Ese error se arrastra al dimensionado del personal.
 - El número de médicos es siempre 1 y el de conductores siempre 1, independientemente del
-  tamaño. Conviene confirmar con el centro si eso sigue siendo así.
+  tamaño de la colecta.
+
+El **coste** depende del módulo del punto de colecta (`MODULE` en `structural.csv`, valores
+`A` a `D`). Un mismo perfil cuesta un 39 % más en un módulo `D` que en uno `A`. La tabla
+completa de costes está en el README de `bloodtwin_staffing_milp`.
 
 **Conclusión:** la entrada del TFG está disponible. Para cada colecta planificada se sabe el
-día, el turno, el punto y cuántas personas de cada categoría hacen falta. No hay que
-calcularlo de nuevo, pero sí **validar la tabla con el centro** antes de construir nada
-encima.
+día, el turno, el punto, el módulo, el tipo de colecta y cuántas personas de cada categoría
+hacen falta.
 
 ### 1.2 Lo que el scheduler entrega
 
@@ -53,56 +56,51 @@ recibe una lista de "puestos a cubrir" ya cerrada.
 
 ---
 
-## 2. El hueco real: no existe información de quién fue a cada colecta
+## 2. Situación de los datos de personal
 
-Esto es lo más importante de la reunión, porque condiciona todo el trabajo.
+**Los datos de personal existen.** El centro dispone del histórico de quién fue a cada
+colecta y cuándo, y de quién no estaba disponible por vacaciones o por estar bloqueado. No
+viven en los repositorios del proyecto, sino en tablas propias del centro, y son datos
+laborales identificables: no deben acabar en ningún repositorio de código.
 
-**La idea de inferir la disponibilidad a partir del histórico no se puede aplicar tal cual.**
-El histórico (`historical_2007-2023.csv`, 2007–2023) tiene estas columnas:
+Eso hace viable desde el principio el modelo base, sin necesidad de inventar la plantilla.
 
-```
-DATE, YEAR, MONTH, DAY, WEEK, WEEK_ABSOLUTE, MONTH_ABSOLUTE, DAY_OF_WEEK, SEASON,
-ID, ID_NO_LETTER, COLLECTION, MODE, BLOCKED, VALIDATED, FORECAST, DONORS,
-DONATIONS, DONATIONS_IDEAL, TUBO, RECHAZADOS, RECHAZOS CALCULADOS, IR EN EL PUNTO DE COLECTA
-```
+### Lo que sí falta
 
-No hay **ninguna columna de persona** ni de turno. El histórico registra *colectas*, no
-*asignaciones de personal*. Por tanto no se puede aplicar el razonamiento "fue este día,
-luego ese día estaba disponible": no consta quién fue.
+**Preferencias personales.** No consta si alguien prefiere mañana o tarde, ni qué destinos
+prefiere, ni con quién trabaja mejor. Es justo lo que daría más riqueza al modelo, porque son
+las restricciones blandas que convierten un problema de cobertura en un problema de
+satisfacción del personal.
 
-En la base de datos existe una tabla `medical_team` con `full_name`, `email`,
-`specialty_type`, `seniority_years`, `collections_count`, `rejection_rate` y
-`absences_count`, pero hoy está poblada con **datos de ejemplo inventados** y, aunque
-tuviera datos reales, son agregados por persona: no dicen qué día fue cada uno.
+Aquí sí cabe la inferencia a partir del histórico, con cautela: ver la **proporción de turnos
+de mañana frente a los de tarde** de cada persona a lo largo de los años. Si alguien tiene un
+reparto claramente desequilibrado de forma sostenida, es un indicio razonable de preferencia
+o de disponibilidad estructural.
 
-### Opciones, en orden de preferencia
+El riesgo es confundir preferencia con imposición: puede que esa persona hiciera siempre
+mañanas porque se lo asignaban, no porque lo prefiriera. Hay dos formas de mitigarlo:
 
-**A. Pedir los datos reales al centro (lo que hay que intentar primero).**
-Lo que haría falta es el cuadrante histórico: por cada colecta pasada, qué personas fueron y
-en qué turno. Aunque sean dos o tres años, o incluso unos meses. Con eso la inferencia de
-disponibilidad que planteas sí es viable y el TFG gana muchísimo valor. Conviene preguntar
-también por vacaciones, permisos, contratos a tiempo parcial y convenio (descansos mínimos,
-máximo de fines de semana seguidos, etc.).
+- Contrastar contra la mezcla de turnos disponible. Si en su zona el 80 % de las colectas
+  eran de mañana, hacer el 80 % de mañanas no dice nada; hacer el 100 % sí.
+- Validar la inferencia con el centro o con una encuesta breve a la plantilla. Con veinte
+  respuestas se puede comprobar si la inferencia acierta, y eso da una sección de validación
+  muy presentable en la memoria.
 
-**B. Generar un conjunto de datos sintético pero realista, documentado como tal.**
-Es perfectamente defendible en un TFG siempre que se explique el procedimiento y que el
-modelo esté preparado para consumir datos reales sin cambios. Se construye una plantilla de
-plantilla ficticia (por ejemplo 40 enfermeros, 8 administrativos, 6 médicos, 10 conductores)
-y se les generan vacaciones, contratos y preferencias con una distribución razonable.
+Mi recomendación: tratar las preferencias inferidas como **restricción blanda con peso bajo**
+y marcarlas explícitamente como inferidas, no como dato. Y dejar el modelo preparado para
+sustituirlas por preferencias declaradas si algún día se recogen.
 
-Aquí sí se puede usar el histórico, pero para otra cosa: **la carga de trabajo real**.
-Del histórico se saca cuántas colectas hubo cada día y de qué tamaño, y por tanto cuánta
-gente hizo falta cada día de los últimos años. Eso permite dimensionar la plantilla ficticia
-para que el problema sea realista y no trivial: ni sobra gente ni es infactible.
+### Tasas de rechazo por perfil médico
 
-**C. Tratar la disponibilidad como escenarios paramétricos.**
-En lugar de un cuadrante concreto, se definen escenarios (verano con 30 % de plantilla de
-vacaciones, invierno con picos de absentismo, etc.) y se estudia cómo responde el modelo.
-Es una vía legítima y da una sección de resultados interesante.
+El trabajo previo del grupo sobre tasas de rechazo según la especialidad del médico, el tipo
+de colecta y si está acompañado en la entrevista es una vía natural de extensión. Los datos
+necesarios existen en parte: `structural.csv` ya tiene el tipo de colecta de cada punto y la
+tabla `medical_team` del esquema contempla `specialty_type` y `rejection_rate`.
 
-**Recomendación:** empezar por B para no bloquear a la alumna, pedir A en paralelo, y dejar
-el modelo preparado para que el origen de los datos sea intercambiable. Si A llega, se
-sustituye el fichero y se reejecuta.
+No entraría en la primera versión. Cuando el modelo base funcione, se incorpora como coste o
+restricción: asignar médicos a los tipos de colecta donde su tasa de rechazo es menor, o
+forzar acompañamiento donde más se nota. Es un buen objetivo secundario porque diferencia el
+TFG de un nurse rostering estándar.
 
 ---
 
@@ -117,8 +115,8 @@ laborales, de disponibilidad y de cualificación.
 ### Objetivos secundarios
 
 1. Caracterizar la demanda de personal a partir del histórico de colectas 2007–2023.
-2. Construir y documentar el conjunto de datos de plantilla y disponibilidad.
-3. Validar y, si procede, actualizar la tabla de necesidades de personal de 2018.
+2. Preparar y anonimizar los datos de plantilla y disponibilidad del centro.
+3. Inferir preferencias de turno a partir del histórico y validarlas.
 4. Definir el formato de intercambio entre el scheduler y el nuevo optimizador.
 5. Empaquetar el modelo como servicio en Docker, siguiendo el patrón del scheduler actual.
 6. Evaluar el modelo: calidad de la solución, tiempo de cálculo y comportamiento al crecer
@@ -126,9 +124,10 @@ laborales, de disponibilidad y de cualificación.
 
 ### Objetivos opcionales (si da tiempo)
 
-7. Integrar el servicio en el simulador DEVS.
-8. Equilibrio de carga entre personas (que no siempre vayan los mismos a los sitios malos).
-9. Robustez ante bajas de última hora: replanificación con mínimo cambio.
+7. Incorporar las tasas de rechazo por especialidad médica y tipo de colecta.
+8. Integrar el servicio en el simulador DEVS.
+9. Equilibrio de carga entre personas.
+10. Robustez ante bajas de última hora: replanificación con mínimo cambio.
 
 ---
 
@@ -140,7 +139,11 @@ laborales, de disponibilidad y de cualificación.
 bloodtwin_staffing_milp
 ```
 
-Con la misma arquitectura que `bloodtwin_scheduler_milp`, que ya está probada:
+**Ya está creado**, privado, y dado de alta como submódulo del repositorio padre. Su README
+recoge los datos de entrada, la tabla de necesidades de personal, los costes por módulo y el
+aviso sobre la previsión de donantes.
+
+Tiene la misma arquitectura que `bloodtwin_scheduler_milp`, que ya está probada:
 
 ```
 bloodtwin_staffing_milp/
@@ -258,9 +261,9 @@ de comandos, no solo desde el IDE. Es lo que hará falta para automatizarlo.
 
 - [ ] Analizar el histórico: colectas por día, tamaño, estacionalidad.
 - [ ] Traducir eso a demanda diaria de personal usando la tabla `PERSONNEL_NEEDS`.
-- [ ] Pedir al centro el cuadrante histórico real y los criterios de convenio.
-- [ ] Construir el conjunto de datos de plantilla y disponibilidad, documentando cada
-      supuesto que se invente.
+- [ ] Preparar y anonimizar los datos de plantilla, asistencia y ausencias del centro.
+- [ ] Recabar los criterios de convenio: descansos, máximos, fines de semana.
+- [ ] Inferir preferencias de turno del histórico y contrastarlas con la mezcla disponible.
 - [ ] Definir el formato de intercambio con el scheduler.
 
 ### Fase 2 — Modelo base (semanas 6–10)
@@ -297,17 +300,15 @@ Lo que debería salir de la reunión, por orden:
 1. **Tramitar hoy la licencia académica de CPLEX.** Es lo único que puede bloquearla por
    motivos ajenos a ella.
 2. Leer el TFM de Eduardo Abreu y venir con preguntas a la siguiente reunión.
-3. Acceso de lectura a `bloodtwin_scheduler_milp` y al repositorio nuevo cuando se cree.
+3. Acceso de lectura a `bloodtwin_scheduler_milp` y a `bloodtwin_staffing_milp`.
 4. Reproducir un nurse rostering de juguete en OPL, para soltarse con el lenguaje.
-5. Dejar claro desde el principio que el histórico **no tiene datos de personal**, para que
-   no pierda semanas buscándolos, y que parte del trabajo será construir ese conjunto de
-   datos de forma justificada.
+5. Acordar cómo se le entregan los datos de personal del centro, ya anonimizados, y dejar
+   claro que no pueden subirse a ningún repositorio.
 
 ### Preguntas abiertas que hay que resolver con el centro
 
-- ¿Existe el cuadrante histórico de personal? ¿En qué formato?
-- ¿Sigue siendo válida la tabla de necesidades de 2018?
 - ¿Qué convenio aplica: descansos mínimos, máximo de días seguidos, fines de semana?
 - ¿Hay personal fijo por zona geográfica o todos pueden ir a cualquier punto?
 - ¿Los conductores pueden hacer otras tareas o son exclusivos?
-- ¿Cuánta gente hay realmente en plantilla, por categoría?
+- ¿Se han recogido alguna vez preferencias declaradas de turno o destino?
+- ¿Se puede hacer una encuesta breve a la plantilla para validar las preferencias inferidas?
