@@ -1,0 +1,22 @@
+# Scan every push and pull request for secrets (passwords, API keys, tokens, private keys).
+# Findings are printed redacted. Same pinned gitleaks as scripts/install_gitleaks_hooks.sh.
+name: gitleaks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks 8.21.2
+        run: |
+          base=https://github.com/gitleaks/gitleaks/releases/download/v8.21.2
+          curl -sSL -o gl.tgz "$base/gitleaks_8.21.2_linux_x64.tar.gz"
+          curl -sSL -o sums.txt "$base/gitleaks_8.21.2_checksums.txt"
+          grep "_linux_x64.tar.gz" sums.txt | awk '{print $1"  gl.tgz"}' | sha256sum -c -
+          tar -xzf gl.tgz gitleaks
+      - name: Scan for secrets
+        run: ./gitleaks git . --redact --no-banner --verbose
